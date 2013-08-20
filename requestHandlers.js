@@ -137,7 +137,7 @@ function upload(response, postData) {
 	for(var i = 0;i < len;i ++){
 		if(arrs[i] < arrs[m]){
 			left.push(arrs[i]);
-		}else if(arrs[i] != arrs[m]){
+		}else if(i != m){
 			right.push(arrs[i]);
 		}
 	}
