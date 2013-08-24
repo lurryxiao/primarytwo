@@ -1,22 +1,38 @@
 var querystring = require("querystring");
+var config = require("./config");
+var fs = require("fs");
+var mc = config.domysql();
+function getfile(filepath,response,postData){
+	filepath = './tpl/'+filepath+'.t';
+	fs.readFile(filepath,function(err,html){
+		config.writeinfo('text/html',html,response,postData);
+	});
+}
+
+function insideByuser(uid,infobody,response,postData){
+	mc.query("select * from content where uid = " + uid, function(err, rs1, fields){
+		console.log(rs1);
+		for(var i = 0;i < rs1.length;i ++){
+			infobody += '<tr><td>'+rs1[i]['content'] + '</td><td>' + rs1[i]['result']+ '</td><td>' + rs1[i]['dotime'] + '</td></tr>';
+		}
+		config.writeinfo('text/html',infobody + '</table><div><form method="post" action="/start"><input type="hidden" name="uid" value="' + uid + '" /><input type="submit" value="Getrank" /></form></div>'+
+    '</body>'+
+    '</html>',response,postData);
+	});
+	return infobody;
+}
+
+function getUserRank(userid,infobody,somefun,response,postData){
+	return somefun(userid,infobody,response,postData);
+}
 function login(response,postData) {
 	console.log("Request handler 'login' was called.");
 	if(postData){
 		console.log("data is ." + querystring.parse(postData).name);
-		var mq = require("mysql");
-	  var mc = mq.createConnection({
-		host: "localhost",
-		user: "root",
-		password: "",
-		database: "trynodejs"
-	  });
-	  mc.connect();
 	  mc.query("select id,username from user limit 1", function(err, rs, fields){
 		if(err){
 			console.log(err);
-			response.writeHead(200, {"Content-Type": "text/html"});
-			response.write('database connected wrong<a href="/login">·µ»ØµÇÂ½</a>');
-			response.end();
+			config.writeinfo('text/html','database connected wrong<a href="/login">go back</a>',response,postData);
 		}else{
 			console.log(rs[0]['username']+'ok');
 			if(querystring.parse(postData).name == rs[0]['username']){
@@ -28,41 +44,15 @@ function login(response,postData) {
     '<body>'+
     '<table width="100%">'+
     '<tr><th>old</th><th>new</th><th>time</th></tr>';
-    mc.query("select * from content where uid = " + rs[0]['id'], function(err, rs1, fields){
-		console.log(rs1);
-		for(var i = 0;i < rs1.length;i ++){
-			infobody += '<tr><td>'+rs1[i]['content'] + '</td><td>' + rs1[i]['result']+ '</td><td>' + rs1[i]['dotime'] + '</td></tr>';
-		}
-		response.writeHead(200, {"Content-Type": "text/html"});
-				response.write(infobody + '</table><div><form method="post" action="/start"><input type="hidden" name="uid" value="' + rs[0]['id'] + '" /><input type="submit" value="Getrank" /></form></div>'+
-    '</body>'+
-    '</html>');
-			response.end();
-	});
+    infobody += getUserRank(rs[0]['id'],infobody,insideByuser,response,postData);
 			}else{
-				response.writeHead(200, {"Content-Type": "text/html"});
-			    response.write('<script>alert("It is wrong name");history.go(-1);</script>');
-			    response.end();
+				config.writeinfo('text/html','<script>alert("It is wrong name");history.go(-1);</script>',response,postData);
 			}
 		}
 	  });
 	  return false;
 	}
-	var body = '<html>'+
-    '<head>'+
-    '<meta http-equiv="Content-Type" content="text/html; '+
-    'charset=utf-8" />'+
-    '</head>'+
-    '<body>'+
-    '<form action="/login" method="post">'+
-    '<input name="name" />'+
-    '<input type="submit" value="login" />'+
-    '</form>'+
-    '</body>'+
-    '</html>';
-    response.writeHead(200, {"Content-Type": "text/html"});
-    response.write(body);
-    response.end();
+	getfile('login',response,postData);
 }
 function start(response, postData) {
   console.log("Request handler 'start' was called."+querystring.parse(postData).uid);
@@ -79,16 +69,13 @@ function start(response, postData) {
     '</form>'+
     '</body>'+
     '</html>';
-    response.writeHead(200, {"Content-Type": "text/html"});
-    response.write(body);
-    response.end();
+    config.writeinfo('text/html',body,response,postData);
 }
 var co1 = 0;
 var co2 = 0;
 
 function upload(response, postData) {
   console.log("Request handler 'upload' was called.");
-  response.writeHead(200, {"Content-Type": "text/plain"});
   var str = querystring.parse(postData).text;
   var strs = str.split(',');
   var string = new Array();
@@ -101,48 +88,60 @@ function upload(response, postData) {
   var endTime = new Date().getTime();
   var dotime = endTime - startTime;
   var uid = querystring.parse(postData).uid;
-  var mq = require("mysql");
-  var mc = mq.createConnection({
-	host: "localhost",
-    user: "root",
-    password: "",
-	database: "trynodejs"
-  });
-  mc.connect();
   mc.query("INSERT INTO content SET uid="+uid+",content='"+querystring.parse(postData).text+"',result='"+newstr+"',len="+strs.length+",co1="+c1+",co2="+c2+",dotime="+dotime, function(err, rs, fields){
     if(err){
 		console.log(err);
-		response.writeHead(200, {"Content-Type": "text/html"});
-	    response.write('<script>alert("something is wrong!");history.go(-1);</script>');
-	    response.end();
+		config.writeinfo('text/html','<script>alert("something is wrong!");history.go(-1);</script>',response,postData);
 	}else{
 		console.log(rs);
-		response.writeHead(200, {"Content-Type": "text/html"});
-	    response.write('<script>alert("success!The result is '+newstr+'");window.location.href="/login"</script>');
-	    response.end();
+		config.writeinfo('text/html','<script>alert("success!The result is '+newstr+'");window.location.href="/login"</script>',response,postData);
 	}
   });
 }
 
  function rank(arrs){
-	 console.log(co1);
-	if(arrs.length <= 1){
-		co2 ++ ;
-		return arrs;
-	}
-	var len = arrs.length;
-	var m = parseInt((len - 1) / 2);
-	var left = new Array();
-	var right = new Array();
-	for(var i = 0;i < len;i ++){
-		if(arrs[i] < arrs[m]){
-			left.push(arrs[i]);
-		}else if(i != m){
-			right.push(arrs[i]);
+	arrs = [arrs];
+	var i = 0;
+	while(1){
+		if(i >= arrs.length){
+			return arrs;
+		}
+		co1 ++;
+		if(arrs[i].length <= 1){
+			i ++;
+			co2 ++;
+			continue;
+		}else{
+			var temp = arrs[i][0];
+			var left = new Array();
+			var right = new Array();
+			var mid = new Array();
+			var newarr = new Array();
+			for(var j = 0;j < arrs[i].length;j ++){
+				if(arrs[i][j] < temp){
+					left.push(arrs[i][j]);
+				}else if(j != 0){
+					right.push(arrs[i][j]);
+				}else{
+					mid.push(arrs[i][0]);
+				}
+			}
+			for(var c = 0;c < arrs.length;c ++){
+				if(c != i){
+					newarr.push(arrs[c]);
+				}else{
+					if(left != '')
+					newarr.push(left);
+					if(mid != '')
+					newarr.push(mid);
+					if(right != ''){
+						newarr.push(right);
+					}
+				}
+			}
+			arrs = newarr;
 		}
 	}
-	co1 ++;
-	return rank(left).concat([arrs[m]],rank(right));
 }
 
 exports.start = start;
